@@ -1,6 +1,15 @@
 import cats.{Applicative, Functor, Monad}
 import cats.implicits._
 
+/** Aim is to be able to parse the following:
+  * var x = 1;
+  * var y = x * 3;
+  * x + y;
+  * (x + 1) * 3 + 1;
+  * var z = 8;
+  *
+  * with the following result: (Map(x -> 1, y -> 3, z -> 8), List(4, 7))
+  */
 object ParserCombinatorsWithState {
   implicit val parserFunctor = new Functor[Parser] {
     override def map[A, B](fa: Parser[A])(f: A => B): Parser[B] = new Parser[B] {
@@ -49,27 +58,6 @@ object ParserCombinatorsWithState {
     }
   }
 
-  /** Aim is to be able to parse the following:
-    * var x = 1;
-    * var y = x * 3;
-    * x + y;
-    * (x + 1) * 3 + 1;
-    * var z = 8;
-    *
-    * with the following result: (Map(x -> 1, y -> 3, z -> 8), List(4, 7))
-    */
-
-  /** Step 1: Parsing of simple arithmetic language:
-    * 1;
-    * 2+2;
-    * 3*3+4*4*(1+2);
-    */
-
-  /** TODO: change into: ?
-    *
-    * sealed trait ParseResult[+T]
-    * trait Parser[+T] extends (Input => ParseResult[T])
-    */
   trait Parser[A] {
     def run: String => Option[(A, String)]
   }
@@ -100,6 +88,31 @@ object ParserCombinatorsWithState {
 
   def some[A](p: Parser[A]): Parser[List[A]] = (p, many(p)).mapN(_ :: _)
 
+  /** Step 1: Parsing of simple arithmetic language:
+    * 1;
+    * 2+2;
+    * 3*3+4*4*(1+2);
+    */
+
+  def num: Parser[Int] = some(conditional(_.isDigit)).map(_.mkString).map(_.toInt)
+
+  def sum: Parser[Int] = for {
+    v1 <- num
+    _ <- char('+')
+    v2 <- num
+  } yield v1 + v2
+
+  def prod: Parser[Int] = for {
+    v1 <- num
+    _ <- char('*')
+    v2 <- num
+  } yield v1 * v2
+
+  // TODO: how to parse last?
+  def sumExpr = many(num <* char('+')).map(_.sum)
+
+//  def expression = many(sum or prod)
+
   def main(args: Array[String]) = {
 
 //    val f = (x: Char) => x.toUpper
@@ -111,10 +124,9 @@ object ParserCombinatorsWithState {
 //      b <- char('b')
 //    } yield b
 
-    val r = some(char('a'))
 
     println(
-      r.run("acbaaaa")
+      sumExpr.run("1+23+4+3+4+6")
     )
   }
 }
